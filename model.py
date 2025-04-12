@@ -334,26 +334,36 @@ class GPT(nn.Module):
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
         """
-        Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
-        the sequence max_new_tokens times, feeding the predictions back into the model each time.
-        Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+        Generate a sequence of indices autoregressively.
+        
+        Parameters:
+        idx: LongTensor of shape (b, t) containing the conditioning sequence;
+            here, t is the effective text tokens length (i.e. block_size - register_token_count).
+        max_new_tokens: number of tokens to generate.
+        temperature: temperature scaling for logits.
+        top_k: if provided, restricts sampling to top_k tokens.
+        
+        Returns:
+        idx: LongTensor containing the complete generated sequence.
+        
+        Note:
+        The model's forward method expects the input sequence length to be (effective_length + register_token_count)
+        = block_size. Thus, here we crop the conditioning sequence to effective_length, where:
+            effective_length = self.config.block_size - self.register_token_count
         """
+        effective_length = self.config.block_size - self.register_token_count
         for _ in range(max_new_tokens):
-            # if the sequence context is growing too long we must crop it at block_size
-            idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
-            # forward the model to get the logits for the index in the sequence
+            # If the sequence is too long, crop it to effective_length tokens
+            idx_cond = idx if idx.size(1) <= effective_length else idx[:, -effective_length:]
             logits, _ = self(idx_cond)
-            # pluck the logits at the final step and scale by desired temperature
+            # Get logits for the last token and apply temperature scaling
             logits = logits[:, -1, :] / temperature
-            # optionally crop the logits to only the top k options
             if top_k is not None:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < v[:, [-1]]] = -float('Inf')
-            # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
-            # sample from the distribution
             idx_next = torch.multinomial(probs, num_samples=1)
-            # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
-
         return idx
+    
+
