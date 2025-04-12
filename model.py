@@ -201,9 +201,10 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)
-
+        
         if targets is not None:
             # ロス計算の際は、register token に対応する部分を除外する
+            logits = self.lm_head(x)
             logits_text = logits[:, self.register_token_count:, :]  # register token 分を除く
             loss = F.cross_entropy(logits_text.view(-1, logits_text.size(-1)),
                                      targets.view(-1), ignore_index=-1)
