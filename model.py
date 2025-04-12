@@ -81,7 +81,7 @@ class CausalSelfAttention(nn.Module):
             # しかし、v.clone() は v 全体をコピーするため、v のサイズが大きい場合は不要なメモリコピーとオーバーヘッドが発生します。
             # この無駄を完全に避けるには、低レイヤーレベル（例えば CUDA カスタムカーネルなど）で、必要な部分のみを効率的に更新する実装が必要です。
             # 全体を clone して連続なテンソルにする
-            #v = v.clone()  
+            v = v.clone()  
             # 先頭 self.register_token_count 個が register token として扱われるため
             v[:, :, :self.register_token_count, :] = 0.0
 
